@@ -28,6 +28,8 @@ class SampleSource {
   SampleSource() = default;
   SampleSource(const SampleSource&) = delete;
   SampleSource& operator=(const SampleSource&) = delete;
+  SampleSource(SampleSource&&) = delete;
+  SampleSource& operator=(SampleSource&&) = delete;
   virtual ~SampleSource() = default;
 
   /// Blocks until the next sample. Returns false at end of stream or when stopped.
@@ -76,7 +78,7 @@ class FileSource final : public SampleSource {
 class UdpSource final : public SampleSource {
  public:
   /// Throws std::runtime_error if the port cannot be bound. Port 0 picks a free port.
-  UdpSource(std::uint16_t port, const StreamFormat& format, const std::atomic<bool>& stop);
+  UdpSource(std::uint16_t port, StreamFormat format, const std::atomic<bool>& stop);
   [[nodiscard]] bool next(Frame& out) override;
   [[nodiscard]] std::uint16_t port() const noexcept { return port_; }
   [[nodiscard]] std::size_t rejectedLines() const noexcept { return rejected_; }

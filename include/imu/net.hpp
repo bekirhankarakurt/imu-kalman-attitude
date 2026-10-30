@@ -26,6 +26,9 @@ class Socket {
   int fd_{-1};
 };
 
+/// Creates a socket of the given type (SOCK_STREAM / SOCK_DGRAM); throws std::runtime_error on failure.
+[[nodiscard]] Socket openSocket(int type);
+
 /// Builds an IPv4 address; throws std::invalid_argument for a malformed address string.
 [[nodiscard]] sockaddr_in makeAddress(const std::string& ip, std::uint16_t port);
 

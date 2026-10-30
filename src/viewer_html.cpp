@@ -131,7 +131,7 @@ std::string_view viewerHtml() noexcept {
 </body>
 </html>
 )HTML";
-  return std::string_view(kPage, sizeof(kPage) - 1);
+  return {kPage, sizeof(kPage) - 1};
 }
 
 }  // namespace imu

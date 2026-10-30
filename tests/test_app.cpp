@@ -102,8 +102,8 @@ TEST(run_writes_log_and_replays_it_from_file) {
   std::getline(in, firstRow);
   CHECK(header.rfind("t,truth_roll", 0) == 0);
   CHECK(firstRow.rfind("0.0000,,,,", 0) == 0);
-  std::remove(csv.c_str());
-  std::remove(log.c_str());
+  static_cast<void>(std::remove(csv.c_str()));
+  static_cast<void>(std::remove(log.c_str()));
 }
 
 TEST(run_reports_errors) {

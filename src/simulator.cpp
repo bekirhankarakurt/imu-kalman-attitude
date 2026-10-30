@@ -9,7 +9,12 @@ namespace {
 constexpr double kTwoPi = 2.0 * kPi;
 
 [[nodiscard]] Vec3 linearAccel(Profile p, double t) noexcept {
-  const double scale = p == Profile::Aggressive ? 1.5 : (p == Profile::Sway ? 0.3 : 0.0);
+  double scale = 0.0;
+  if (p == Profile::Aggressive) {
+    scale = 1.5;
+  } else if (p == Profile::Sway) {
+    scale = 0.3;
+  }
   return {scale * std::sin(kTwoPi * 0.7 * t), scale * std::cos(kTwoPi * 0.5 * t),
           0.5 * scale * std::sin(kTwoPi * 0.9 * t)};
 }

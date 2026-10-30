@@ -10,8 +10,8 @@ namespace imu {
 namespace {
 
 [[nodiscard]] std::string_view trim(std::string_view s) {
-  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) s.remove_prefix(1);
-  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) s.remove_suffix(1);
+  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front())) != 0) s.remove_prefix(1);
+  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back())) != 0) s.remove_suffix(1);
   return s;
 }
 
@@ -54,7 +54,7 @@ ColumnsParse parseColumns(std::string_view spec) {
   ColumnsParse result;
   std::set<Column> seen;
   for (const std::string_view token : split(spec, ",")) {
-    const auto it = std::find_if(std::begin(kNames), std::end(kNames),
+    const auto* const it = std::find_if(std::begin(kNames), std::end(kNames),
                                  [&](const Name& n) { return n.text == token; });
     if (it == std::end(kNames)) {
       result.error = "unknown column '" + std::string(token) + "'";
@@ -67,7 +67,7 @@ ColumnsParse parseColumns(std::string_view spec) {
     result.columns.push_back(it->column);
   }
 
-  const auto has = [&](Column c) { return seen.count(c) != 0; };
+  const auto has = [&](Column c) { return seen.find(c) != seen.end(); };
   for (const Column c : {Column::AccelX, Column::AccelY, Column::AccelZ, Column::GyroX, Column::GyroY,
                          Column::GyroZ}) {
     if (!has(c)) {
@@ -100,7 +100,7 @@ std::optional<ParsedSample> parseLine(const StreamFormat& format, std::string_vi
     const std::optional<double> v = toDouble(fields[i]);
     if (!v) return std::nullopt;
     switch (c) {
-      case Column::TimeSec: out.time = *v; break;
+      case Column::TimeSec: out.time = v; break;
       case Column::TimeMs: out.time = *v * 1e-3; break;
       case Column::AccelX: out.imu.accel.x = *v; break;
       case Column::AccelY: out.imu.accel.y = *v; break;

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 
 namespace imu {
 
@@ -56,10 +57,8 @@ bool FileSource::next(Frame& out) {
   return true;
 }
 
-UdpSource::UdpSource(std::uint16_t port, const StreamFormat& format, const std::atomic<bool>& stop)
-    : format_(format), stop_(stop) {
-  socket_ = Socket(::socket(AF_INET, SOCK_DGRAM, 0));
-  if (!socket_.valid()) throw std::runtime_error(errnoMessage("socket"));
+UdpSource::UdpSource(std::uint16_t port, StreamFormat format, const std::atomic<bool>& stop)
+    : socket_(openSocket(SOCK_DGRAM)), format_(std::move(format)), stop_(stop) {
   const sockaddr_in addr = makeAddress("0.0.0.0", port);
   if (::bind(socket_.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0)
     throw std::runtime_error(errnoMessage("cannot bind UDP port " + std::to_string(port)));

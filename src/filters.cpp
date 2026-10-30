@@ -98,7 +98,7 @@ void MahonyFilter::step(const ImuSample& s, double dt) {
   q_ = (q_ * Quat::fromRotationVector(omega * dt)).normalized();
 }
 
-void EkfFilter::onInit(const ImuSample&) {
+void EkfFilter::onInit(const ImuSample& /*s*/) {
   cov_ = Mat6{};
   const double a = p_.initialAttitudeStd * p_.initialAttitudeStd;
   const double b = p_.initialBiasStd * p_.initialBiasStd;
@@ -130,17 +130,20 @@ void EkfFilter::step(const ImuSample& s, double dt) {
 
   // Update 1: gravity direction. h(x) = R^T * up, Jacobian wrt body-frame error = [g_b]x.
   if (const auto tilt = tiltOf(q_, s.accel)) {
+    const Vec3 expected = tilt->expected;
+    const Vec3 measured = tilt->measured;
+    const double weight = tilt->weight;
     Mat<3, 6> h;
-    const Mat3 gx = skew(tilt->expected);
+    const Mat3 gx = skew(expected);
     for (std::size_t i = 0; i < 3; ++i)
       for (std::size_t j = 0; j < 3; ++j) h(i, j) = gx(i, j);
     Mat<3, 1> y;
-    const Vec3 r = tilt->measured - tilt->expected;
+    const Vec3 r = measured - expected;
     y(0, 0) = r.x;
     y(1, 0) = r.y;
     y(2, 0) = r.z;
     const double sigma = p_.accelNoise / std::sqrt(dt) / kGravity;
-    correct(h, y, (sigma * sigma / tilt->weight) * identity<3>());
+    correct(h, y, (sigma * sigma / weight) * identity<3>());
   }
 
   // Update 2: heading from the tilt-compensated magnetometer. A rotation about world z

@@ -37,9 +37,7 @@ std::string HttpServer::respond(const StateStore& store, std::string_view reques
 }
 
 HttpServer::HttpServer(const StateStore& store, const std::string& bindAddress, std::uint16_t port)
-    : store_(store) {
-  listener_ = Socket(::socket(AF_INET, SOCK_STREAM, 0));
-  if (!listener_.valid()) throw std::runtime_error(errnoMessage("socket"));
+    : store_(store), listener_(openSocket(SOCK_STREAM)) {
   const int on = 1;
   ::setsockopt(listener_.get(), SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   const sockaddr_in addr = makeAddress(bindAddress, port);
