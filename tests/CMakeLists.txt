@@ -1,0 +1,11 @@
+set(IMU_TESTS test_math test_stream_format test_filters test_accuracy test_net test_app)
+
+foreach(name ${IMU_TESTS})
+  add_executable(${name} ${name}.cpp test_main.cpp)
+  target_link_libraries(${name} PRIVATE imu_core)
+  target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic -Wshadow -Wconversion)
+  if(IMU_WARNINGS_AS_ERRORS)
+    target_compile_options(${name} PRIVATE -Werror)
+  endif()
+  add_test(NAME ${name} COMMAND ${name})
+endforeach()
