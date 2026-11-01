@@ -19,6 +19,7 @@ Checks: >
   -modernize-avoid-c-arrays,
   -modernize-use-trailing-return-type,
   -readability-magic-numbers,
+  -readability-math-missing-parentheses,
   -readability-identifier-length,
   -readability-function-cognitive-complexity,
   -readability-braces-around-statements,
