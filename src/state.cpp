@@ -63,12 +63,12 @@ std::string toJson(const Snapshot& s) {
 }
 
 void StateStore::publish(Snapshot s) {
-  const std::lock_guard<std::mutex> lock(mutex_);
+  const std::scoped_lock<std::mutex> lock(mutex_);
   snapshot_ = std::move(s);
 }
 
 std::string StateStore::json() const {
-  const std::lock_guard<std::mutex> lock(mutex_);
+  const std::scoped_lock<std::mutex> lock(mutex_);
   return toJson(snapshot_);
 }
 
