@@ -48,6 +48,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y doxygen
       - name: Build docs
         run: |
+          mkdir -p build/doxygen
           doxygen Doxyfile
           mkdir -p site
           mv build/doxygen/html site/api
