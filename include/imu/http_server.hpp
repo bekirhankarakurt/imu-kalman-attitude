@@ -18,6 +18,8 @@ class HttpServer {
   HttpServer(const StateStore& store, const std::string& bindAddress, std::uint16_t port);
   HttpServer(const HttpServer&) = delete;
   HttpServer& operator=(const HttpServer&) = delete;
+  HttpServer(HttpServer&&) = delete;
+  HttpServer& operator=(HttpServer&&) = delete;
   ~HttpServer();
 
   [[nodiscard]] std::uint16_t port() const noexcept { return port_; }

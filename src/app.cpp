@@ -3,11 +3,12 @@
 #include <algorithm>
 #include <array>
 #include <csignal>
-#include <cstdio>
+#include <iomanip>
 #include <exception>
 #include <fstream>
 #include <memory>
 #include <ostream>
+#include <sstream>
 #include <string>
 
 #include "imu/evaluation.hpp"
@@ -21,10 +22,14 @@ namespace {
 constexpr double kPublishHz = 50.0;
 constexpr double kWarmupSeconds = 10.0;
 
-std::string format(const char* fmt, double a = 0, double b = 0, double c = 0, double d = 0, double e = 0) {
-  char buf[256];
-  std::snprintf(buf, sizeof(buf), fmt, a, b, c, d, e);
-  return buf;
+/// Fixed-point text; `width` 0 means no padding.
+std::string fixed(double v, int precision, int width = 0, bool showSign = false) {
+  std::ostringstream text;
+  text << std::fixed << std::setprecision(precision);
+  if (showSign) text << std::showpos;
+  if (width > 0) text << std::setw(width);
+  text << v;
+  return text.str();
 }
 
 std::unique_ptr<SampleSource> makeSource(const Options& o, const StreamFormat& fmt, bool realtime,
@@ -61,7 +66,7 @@ std::size_t rejectedOf(const SampleSource& s) {
 
 int run(const Options& o, std::ostream& out, std::ostream& err, const std::atomic<bool>& stop) {
   try {
-    ::signal(SIGPIPE, SIG_IGN);
+    static_cast<void>(std::signal(SIGPIPE, SIG_IGN));
 
     StreamFormat fmt;
     fmt.gyroDegrees = o.gyroDegrees;
@@ -138,16 +143,18 @@ int run(const Options& o, std::ostream& out, std::ostream& err, const std::atomi
       }
 
       if (log.is_open()) {
-        log << format("%.4f", t);
+        log << fixed(t, 4);
         const Euler tr = frame.truth ? frame.truth->toEuler() : Euler{};
         if (frame.truth) {
-          log << format(",%.3f,%.3f,%.3f", radToDeg(tr.roll), radToDeg(tr.pitch), radToDeg(tr.yaw));
+          log << ',' << fixed(radToDeg(tr.roll), 3) << ',' << fixed(radToDeg(tr.pitch), 3) << ','
+              << fixed(radToDeg(tr.yaw), 3);
         } else {
           log << ",,,";
         }
         for (std::size_t k = 0; k < FilterBank::kCount; ++k) {
           const Euler e = bank.get(static_cast<FilterKind>(k)).orientation().toEuler();
-          log << format(",%.3f,%.3f,%.3f", radToDeg(e.roll), radToDeg(e.pitch), radToDeg(e.yaw));
+          log << ',' << fixed(radToDeg(e.roll), 3) << ',' << fixed(radToDeg(e.pitch), 3) << ','
+              << fixed(radToDeg(e.yaw), 3);
         }
         log << '\n';
       }
@@ -172,15 +179,13 @@ int run(const Options& o, std::ostream& out, std::ostream& err, const std::atomi
         const AttitudeFilter& f = bank.get(o.show);
         const Euler e = f.orientation().toEuler();
         const Vec3 b = f.gyroBias();
-        char line[200];
-        std::snprintf(line, sizeof(line),
-                      "t=%7.2fs  %-13s roll %7.2f  pitch %7.2f  yaw %7.2f deg | bias %+6.2f %+6.2f %+6.2f deg/s",
-                      t, std::string(f.name()).c_str(), radToDeg(e.roll), radToDeg(e.pitch),
-                      radToDeg(e.yaw), radToDeg(b.x), radToDeg(b.y), radToDeg(b.z));
-        out << line;
+        out << "t=" << fixed(t, 2, 7) << "s  " << std::left << std::setw(13) << f.name() << std::right
+            << " roll " << fixed(radToDeg(e.roll), 2, 7) << "  pitch " << fixed(radToDeg(e.pitch), 2, 7)
+            << "  yaw " << fixed(radToDeg(e.yaw), 2, 7) << " deg | bias " << fixed(radToDeg(b.x), 2, 6, true)
+            << ' ' << fixed(radToDeg(b.y), 2, 6, true) << ' ' << fixed(radToDeg(b.z), 2, 6, true) << " deg/s";
         if (frame.truth) {
           const double ang = radToDeg((frame.truth->conjugate() * f.orientation()).toRotationVector().norm());
-          out << format(" | err %.2f deg", ang);
+          out << " | err " << fixed(ang, 2) << " deg";
         }
         out << '\n';
       }
@@ -191,18 +196,17 @@ int run(const Options& o, std::ostream& out, std::ostream& err, const std::atomi
     out << '\n';
 
     if (haveTruth) {
-      out << format("\nerror vs ground truth, RMSE after %.1f s warm-up [deg]", warmup);
+      out << "\nerror vs ground truth, RMSE after " << fixed(warmup, 1) << " s warm-up [deg]";
       if (o.noMag) out << "  (no magnetometer: yaw is unobservable)";
       out << '\n';
       out << "filter          roll   pitch     yaw  attitude  bias err [deg/s]\n";
       for (std::size_t k = 0; k < FilterBank::kCount; ++k) {
         const AttitudeFilter& f = bank.get(static_cast<FilterKind>(k));
         const ErrorAccumulator& a = errors[k];
-        char row[160];
-        std::snprintf(row, sizeof(row), "%-13s %6.2f  %6.2f  %6.2f    %6.2f  %6.3f\n",
-                      std::string(f.name()).c_str(), a.rollRmseDeg(), a.pitchRmseDeg(), a.yawRmseDeg(),
-                      a.attitudeRmseDeg(), radToDeg((f.gyroBias() - lastTrueBias).norm()));
-        out << row;
+        out << std::left << std::setw(13) << f.name() << std::right << ' ' << fixed(a.rollRmseDeg(), 2, 6) << "  "
+            << fixed(a.pitchRmseDeg(), 2, 6) << "  " << fixed(a.yawRmseDeg(), 2, 6) << "    "
+            << fixed(a.attitudeRmseDeg(), 2, 6) << "  " << fixed(radToDeg((f.gyroBias() - lastTrueBias).norm()), 3, 6)
+            << '\n';
       }
     }
     return 0;

@@ -11,7 +11,7 @@
 
 namespace imu {
 
-enum class SourceKind { Sim, Udp, File };
+enum class SourceKind : std::uint8_t { Sim, Udp, File };
 
 struct Options {
   SourceKind source{SourceKind::Sim};

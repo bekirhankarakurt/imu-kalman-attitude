@@ -1,47 +1,48 @@
 #include "imu/state.hpp"
 
 #include <cmath>
-#include <cstdio>
+#include <iomanip>
+#include <sstream>
 
 namespace imu {
 namespace {
 
-void appendNumber(std::string& out, double v, const char* format = "%.4f") {
-  char buf[48];
-  std::snprintf(buf, sizeof(buf), format, std::isfinite(v) ? v : 0.0);
-  out += buf;
+void appendNumber(std::string& out, double v, int precision = 4) {
+  std::ostringstream text;
+  text << std::fixed << std::setprecision(precision) << (std::isfinite(v) ? v : 0.0);
+  out += text.str();
 }
 
 void appendAttitude(std::string& out, const Quat& q) {
   const Euler e = q.toEuler();
-  out += "\"q\":[";
-  appendNumber(out, q.w, "%.6f");
+  out += R"("q":[)";
+  appendNumber(out, q.w, 6);
   for (const double c : {q.x, q.y, q.z}) {
     out += ',';
-    appendNumber(out, c, "%.6f");
+    appendNumber(out, c, 6);
   }
-  out += "],\"roll\":";
+  out += R"(],"roll":)";
   appendNumber(out, radToDeg(e.roll));
-  out += ",\"pitch\":";
+  out += R"(,"pitch":)";
   appendNumber(out, radToDeg(e.pitch));
-  out += ",\"yaw\":";
+  out += R"(,"yaw":)";
   appendNumber(out, radToDeg(e.yaw));
 }
 
 }  // namespace
 
 std::string toJson(const Snapshot& s) {
-  std::string out = "{\"t\":";
-  appendNumber(out, s.t, "%.3f");
-  out += ",\"samples\":" + std::to_string(s.samples) + ",\"rate_hz\":";
-  appendNumber(out, s.rateHz, "%.1f");
-  out += ",\"selected\":\"" + s.selected + "\",\"filters\":[";
+  std::string out = R"({"t":)";
+  appendNumber(out, s.t, 3);
+  out += R"(,"samples":)" + std::to_string(s.samples) + R"(,"rate_hz":)";
+  appendNumber(out, s.rateHz, 1);
+  out += R"(,"selected":")" + s.selected + R"(","filters":[)";
   for (std::size_t i = 0; i < s.filters.size(); ++i) {
     const FilterState& f = s.filters[i];
     if (i != 0) out += ',';
-    out += "{\"name\":\"" + f.name + "\",";
+    out += R"({"name":")" + f.name + R"(",)";
     appendAttitude(out, f.q);
-    out += ",\"bias_dps\":[";
+    out += R"(,"bias_dps":[)";
     appendNumber(out, radToDeg(f.bias.x));
     out += ',';
     appendNumber(out, radToDeg(f.bias.y));
@@ -49,7 +50,7 @@ std::string toJson(const Snapshot& s) {
     appendNumber(out, radToDeg(f.bias.z));
     out += "]}";
   }
-  out += "],\"truth\":";
+  out += R"(],"truth":)";
   if (s.truth) {
     out += '{';
     appendAttitude(out, *s.truth);

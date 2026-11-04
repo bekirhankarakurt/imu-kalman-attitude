@@ -8,8 +8,10 @@ int main() {
     } catch (const std::exception& e) {
       test::fail(__FILE__, __LINE__, std::string("uncaught exception in ") + c.name + ": " + e.what());
     }
+    // cppcheck-suppress knownConditionTrueFalse
     std::cout << (test::failures() == before ? "[ ok ] " : "[FAIL] ") << c.name << '\n';
   }
   std::cout << test::registry().size() << " tests, " << test::failures() << " failed assertions\n";
+  // cppcheck-suppress knownConditionTrueFalse
   return test::failures() == 0 ? 0 : 1;
 }

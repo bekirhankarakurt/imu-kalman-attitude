@@ -29,6 +29,12 @@ int Socket::release() noexcept {
   return fd;
 }
 
+Socket openSocket(int type) {
+  Socket s(::socket(AF_INET, type, 0));
+  if (!s.valid()) throw std::runtime_error(errnoMessage("socket"));
+  return s;
+}
+
 sockaddr_in makeAddress(const std::string& ip, std::uint16_t port) {
   sockaddr_in addr{};
   addr.sin_family = AF_INET;

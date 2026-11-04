@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -25,6 +26,8 @@ class AttitudeFilter {
   AttitudeFilter() = default;
   AttitudeFilter(const AttitudeFilter&) = delete;
   AttitudeFilter& operator=(const AttitudeFilter&) = delete;
+  AttitudeFilter(AttitudeFilter&&) = delete;
+  AttitudeFilter& operator=(AttitudeFilter&&) = delete;
   virtual ~AttitudeFilter() = default;
 
   /// Feeds one sample. The first sample initialises the attitude from gravity (and mag).
@@ -106,7 +109,7 @@ class EkfFilter final : public AttitudeFilter {
   Mat6 cov_;
 };
 
-enum class FilterKind { Complementary, Mahony, Ekf };
+enum class FilterKind : std::uint8_t { Complementary, Mahony, Ekf };
 
 [[nodiscard]] std::string_view toString(FilterKind k) noexcept;
 
