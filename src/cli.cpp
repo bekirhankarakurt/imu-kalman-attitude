@@ -94,8 +94,6 @@ ParseResult parseArgs(const std::vector<std::string>& args) {
 
     if (!needValue()) return fail("option " + a + " needs a value");
     const std::string& v = args[++i];
-    double d = 0.0;
-    unsigned long long u = 0;
 
     if (a == "--source") {
       if (v == "sim") o.source = SourceKind::Sim;
@@ -103,9 +101,11 @@ ParseResult parseArgs(const std::vector<std::string>& args) {
       else if (v == "file") o.source = SourceKind::File;
       else return fail("--source must be sim, udp or file");
     } else if (a == "--port") {
+      unsigned long long u = 0;
       if (!toUInt(v, 65535, u)) return fail("--port must be 0-65535");
       o.udpPort = static_cast<std::uint16_t>(u);
     } else if (a == "--http") {
+      unsigned long long u = 0;
       if (!toUInt(v, 65535, u)) return fail("--http must be 0-65535");
       o.httpPort = static_cast<std::uint16_t>(u);
     } else if (a == "--file") {
@@ -127,12 +127,14 @@ ParseResult parseArgs(const std::vector<std::string>& args) {
       else if (v == "ekf") o.show = FilterKind::Ekf;
       else return fail("--show must be complementary, mahony or ekf");
     } else if (a == "--seed") {
+      unsigned long long u = 0;
       if (!toUInt(v, ~0ULL, u)) return fail("--seed must be a non-negative integer");
       o.seed = u;
     } else if (a == "--gyro-bias") {
       if (!toVec3(v, o.gyroBias)) return fail("--gyro-bias needs X,Y,Z");
     } else if (a == "--rate" || a == "--duration" || a == "--gyro-noise" || a == "--accel-noise" ||
                a == "--mag-noise" || a == "--print-hz" || a == "--kp" || a == "--ki" || a == "--tau") {
+      double d = 0.0;
       if (!toDouble(v, d)) return fail(a + " needs a number");
       if (a == "--rate") {
         if (d <= 0.0) return fail("--rate must be positive");
