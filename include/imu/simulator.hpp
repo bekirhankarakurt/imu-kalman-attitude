@@ -10,7 +10,7 @@
 
 namespace imu {
 
-enum class Profile { Static, Sway, Aggressive };
+enum class Profile : std::uint8_t { Static, Sway, Aggressive };
 
 [[nodiscard]] std::string_view toString(Profile p) noexcept;
 

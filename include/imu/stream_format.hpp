@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -10,7 +11,7 @@
 namespace imu {
 
 /// Meaning of one CSV field in a sensor-streaming line.
-enum class Column {
+enum class Column : std::uint8_t {
   Skip,
   TimeSec,
   TimeMs,

@@ -9,9 +9,9 @@
 
 namespace {
 
-std::atomic<bool> g_stop{false};
+std::atomic<bool> g_stop{false};  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables): set from a signal handler
 
-extern "C" void onSignal(int) { g_stop.store(true); }
+extern "C" void onSignal(int /*signal*/) { g_stop.store(true); }
 
 }  // namespace
 
@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
     std::cout << imu::usage();
     return 0;
   }
-  std::signal(SIGINT, onSignal);
-  std::signal(SIGTERM, onSignal);
+  static_cast<void>(std::signal(SIGINT, onSignal));
+  static_cast<void>(std::signal(SIGTERM, onSignal));
   return imu::run(parsed.options, std::cout, std::cerr, g_stop);
 }

@@ -1,0 +1,10 @@
+---
+# Test macros expand to do/while and tests register at static-init time by design.
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-avoid-do-while,
+  -cert-err58-cpp,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -bugprone-unchecked-optional-access,
+  -readability-function-size,
+  -readability-container-size-empty
