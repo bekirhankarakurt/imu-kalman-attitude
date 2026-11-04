@@ -3,9 +3,16 @@
 Real-time roll/pitch/yaw from a phone's IMU over UDP, using a complementary filter, Mahony and a quaternion error-state Kalman filter with gyro-bias estimation, plus a built-in simulator and a live 3D browser viewer.
 
 [![CI](https://github.com/bekirhankarakurt/imu-kalman-attitude/actions/workflows/ci.yml/badge.svg)](https://github.com/bekirhankarakurt/imu-kalman-attitude/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/bekirhankarakurt/imu-kalman-attitude/actions/workflows/codeql.yml/badge.svg)](https://github.com/bekirhankarakurt/imu-kalman-attitude/actions/workflows/codeql.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fbekirhankarakurt.github.io%2Fimu-kalman-attitude%2Fcoverage.json)](https://bekirhankarakurt.github.io/imu-kalman-attitude/coverage/)
+[![Release](https://img.shields.io/github/v/release/bekirhankarakurt/imu-kalman-attitude)](https://github.com/bekirhankarakurt/imu-kalman-attitude/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg)](https://en.cppreference.com/w/cpp/17)
 [![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](#requirements)
+
+![Terminal demo of imu_attitude on simulated motion](docs/demo.gif)
+
+**Documentation:** [API reference and coverage report](https://bekirhankarakurt.github.io/imu-kalman-attitude/) - [Changelog](CHANGELOG.md) - [Contributing](CONTRIBUTING.md)
 
 ## Why / what
 
@@ -40,6 +47,8 @@ ekf             0.52    0.43    0.67      0.87   0.028
 The simulated gyro bias is (1.15, -0.86, 0.57) deg/s; the EKF converges to it within seconds (final error 0.03 deg/s).
 
 ## Quick start (60 seconds)
+
+Prebuilt `linux-x86_64` / `linux-aarch64` archives are on the [Releases](https://github.com/bekirhankarakurt/imu-kalman-attitude/releases) page. To build from source:
 
 ```bash
 git clone https://github.com/bekirhankarakurt/imu-kalman-attitude.git
@@ -220,7 +229,7 @@ ctest --test-dir build --output-on-failure
 | `test_net` | JSON, HTTP routing and loopback server, UDP source |
 | `test_app` | CLI parsing, end-to-end runs, file replay, CSV logging, error paths |
 
-CI builds with GCC and Clang (warnings as errors) and runs the whole suite again under ASan + UBSan.
+CI builds with GCC and Clang (warnings as errors), runs the whole suite again under ASan + UBSan, runs cppcheck and clang-tidy (`.clang-tidy`), CodeQL, and publishes a line-coverage report and Doxygen API docs to GitHub Pages.
 
 ## Troubleshooting / FAQ
 
@@ -254,7 +263,10 @@ CI builds with GCC and Clang (warnings as errors) and runs the whole suite again
 │   ├── cli.hpp, app.hpp      options and the run loop
 ├── src/                      implementations; viewer_html.cpp holds the 3D page; main.cpp
 ├── tests/                    dependency-free test framework + CTest suites
-└── .github/workflows/ci.yml  GCC, Clang, ASan/UBSan
+├── docs/                     demo.cast (asciinema recording) and demo.gif
+├── Doxyfile, .clang-tidy     API docs and static-analysis configuration
+├── CHANGELOG.md, SECURITY.md, CONTRIBUTING.md
+└── .github/                  workflows (ci, codeql, pages, release), issue/PR templates, dependabot
 ```
 
 ## Roadmap
@@ -265,6 +277,7 @@ CI builds with GCC and Clang (warnings as errors) and runs the whole suite again
 - [ ] Magnetometer hard/soft-iron calibration
 - [ ] Accelerometer bias and linear-acceleration modelling in the EKF
 - [ ] WebSocket push instead of polling
+- [x] Static analysis, CodeQL, coverage, API docs and tagged releases
 - [ ] macOS job in CI
 
 ## License
