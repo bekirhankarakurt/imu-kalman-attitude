@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   coverage:
     name: Coverage
@@ -65,6 +61,9 @@ jobs:
     if: github.event_name == 'push'
     needs: [coverage, docs]
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
