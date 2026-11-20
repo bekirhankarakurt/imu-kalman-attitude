@@ -41,14 +41,17 @@ std::string httpGet(std::uint16_t port, const std::string& path) {
 TEST(json_contains_expected_fields) {
   const std::string j = toJson(sampleSnapshot());
   CHECK(j.find("\"selected\":\"ekf\"") != std::string::npos);
+  CHECK(j.find("\"stationary\":false") != std::string::npos);
   CHECK(j.find("\"roll\":5.7296") != std::string::npos);
   CHECK(j.find("\"truth\":null") != std::string::npos);
   CHECK(j.find("nan") == std::string::npos);
   Snapshot s = sampleSnapshot();
   s.truth = Quat{};
+  s.stationary = true;
   s.t = std::nan("");
   const std::string j2 = toJson(s);
   CHECK(j2.find("\"truth\":{\"q\"") != std::string::npos);
+  CHECK(j2.find("\"stationary\":true") != std::string::npos);
   CHECK(j2.find("nan") == std::string::npos);
 }
 
@@ -59,6 +62,7 @@ TEST(respond_routes_requests) {
   CHECK(page.rfind("HTTP/1.1 200 OK", 0) == 0);
   CHECK(page.find("<canvas") == std::string::npos);
   CHECK(page.find("matrix3d") != std::string::npos);
+  CHECK(page.find(">Still<") != std::string::npos);
   const std::string api = HttpServer::respond(store, "GET /api/state?x=1 HTTP/1.1\r\n\r\n");
   CHECK(api.find("application/json") != std::string::npos);
   CHECK(api.find("\"samples\":150") != std::string::npos);

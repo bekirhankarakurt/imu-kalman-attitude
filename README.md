@@ -17,7 +17,7 @@ Real-time roll/pitch/yaw from a phone's IMU over UDP, using a complementary filt
 ## Why / what
 
 - **Three estimators, one stream.** Complementary, Mahony and an error-state EKF run side by side on identical data, so you can compare them directly.
-- **Gyro bias estimation.** Mahony (integral term) and the EKF (explicit bias states) learn the gyro offset online; the EKF reports it in deg/s.
+- **Gyro bias estimation.** Mahony (integral term) and the EKF (explicit bias states) learn the gyro offset online; the EKF reports it in deg/s. At rest the EKF's zero-angular-rate update also learns the yaw bias, which gravity alone cannot see.
 - **Hardware optional.** A deterministic simulator (bias, random walk, white noise, linear acceleration, magnetometer) provides ground truth, so accuracy is measured, not guessed. Every test runs without a phone.
 - **Real input.** Streams CSV over UDP from a free Android app, or replays a recorded CSV file.
 - **Live view.** A tiny built-in HTTP server hosts a self-contained page (no CDN, no build step) that polls JSON and rotates a 3D box.
@@ -118,6 +118,7 @@ imu_attitude [options]
 | `--gyro-noise` / `--accel-noise` / `--mag-noise` | `0.0007` / `0.005` / `0.4` | Simulator noise: gyro [rad/s/sqrt(Hz)], accel [m/s^2/sqrt(Hz)], mag [uT] |
 | `--kp` / `--ki` | `1.5` / `0.1` | Mahony proportional / integral gain |
 | `--tau S` | `1.0` | Complementary filter time constant |
+| `--no-zupt` | off (ZUPT on) | Disable the EKF zero-angular-rate update |
 | `--show NAME` | `ekf` | Filter shown in the terminal and selected in the viewer |
 | `--http PORT` | off | Serve the viewer and `/api/state`; implies `--realtime` for sim/file |
 | `--bind ADDR` | `127.0.0.1` | HTTP bind address (use `0.0.0.0` to view from another device) |
@@ -136,11 +137,13 @@ Exit codes: `0` success, `1` runtime error (bad file, port in use), `2` usage er
 ./build/imu_attitude --profile aggressive --duration 60 --quiet
 ```
 
-**2. See what happens without a magnetometer** (roll/pitch stay accurate, yaw drifts)
+**2. See what happens without a magnetometer** (roll/pitch stay accurate; on this swaying profile yaw still drifts)
 
 ```bash
 ./build/imu_attitude --duration 60 --quiet --no-mag
 ```
+
+On `--profile static` the device is at rest, so the EKF learns the gyro bias and holds the heading it started with. `--no-zupt` leaves that static yaw drifting (14.2 deg RMSE over 60 s, seed 1). The absolute heading without a magnetometer is still the heading at start-up: the static profile's truth yaw is 30 deg, which no filter can recover from gyro and gravity alone, so holding it shows up as about 29.7 deg yaw RMSE.
 
 **3. Replay a recorded CSV file** (here: a 5 s recording made with `awk`, rotating about z at 0.5 rad/s)
 
@@ -179,14 +182,14 @@ head -2 estimates.csv   # t,truth_roll,truth_pitch,truth_yaw,complementary_roll,
 |---|---|---|---|
 | Complementary | accel tilt + mag heading, fixed time constant | none (steady-state error ~ bias x tau) | Simplest, robust |
 | Mahony | same error signal, PI feedback on gyro | integral term | Two gains to tune |
-| Error-state EKF | gravity vector + mag heading with covariance | 3 explicit states | Gains adapt to noise settings; 6x6 covariance, Joseph-form update |
+| Error-state EKF | gravity vector + mag heading, and a zero-rate update when still | 3 explicit states | Gains adapt to noise settings; 6x6 covariance, Joseph-form update |
 
 Design trade-offs:
 
 - **Error-state, not full-state.** The nominal quaternion is propagated by integration and the filter estimates a 3-D body-frame rotation error plus bias, so the covariance stays 6x6 and the unit-norm constraint is never violated.
 - **Gravity as a vector measurement.** The EKF uses the normalised accelerometer vector (Jacobian `[g_b]x`), not Euler angles, so there is no gimbal-lock singularity in the update.
 - **Adaptive accelerometer trust.** All filters scale or skip the accelerometer correction when `|a|` deviates from 1 g (up to 0.4 g taper). This protects against linear acceleration at the cost of slower correction during hard manoeuvres.
-- **Yaw needs a magnetometer.** Without it yaw and the z-axis gyro bias are unobservable; yaw drifts and only roll/pitch are reliable. Magnetometer is used as a tilt-compensated heading only (no hard/soft-iron calibration; calibrate on the phone if heading is off).
+- **Yaw needs a magnetometer while moving.** Without one, yaw still drifts during motion: gravity does not observe the gyro bias about the up axis. Whenever the device rests, the EKF zero-angular-rate update (ZUPT) treats the mean raw gyro over a short window as that bias and learns all three components, including z. Heading is then held at whatever yaw the filter started with; it is not pulled toward magnetic north. On the static no-magnetometer profile (60 s, seed 1) the uncorrected bias walks that unknown initial heading (truth yaw is 30 deg) through 14.2 deg yaw RMSE and leaves a 0.50 deg/s bias error. With ZUPT the heading stays put, so absolute yaw RMSE is 29.7 deg, and the bias error falls to 0.055 deg/s (z component under 0.1 deg/s; drift about the held heading under 3 deg). `--no-zupt` restores the drifting behaviour. The magnetometer, when present, is a tilt-compensated heading only (no hard/soft-iron calibration; calibrate on the phone if heading is off).
 - **Single-threaded HTTP.** One request at a time with a 1 s read timeout: plenty for a polling viewer, not a general web server.
 - **Heading convention.** World frame is x = magnetic north, y = west, z = up; angles are ZYX Euler (roll, pitch, yaw).
 
@@ -207,12 +210,12 @@ Fields are separated by `,` `;` or tab. Header lines, short lines and non-numeri
 ### `GET /api/state`
 
 ```json
-{"t":1.430,"samples":144,"rate_hz":100.0,"selected":"ekf",
+{"t":1.430,"samples":144,"rate_hz":100.0,"selected":"ekf","stationary":false,
  "filters":[{"name":"ekf","q":[w,x,y,z],"roll":0.0,"pitch":0.0,"yaw":0.0,"bias_dps":[0.0,0.0,0.0]}],
  "truth":null}
 ```
 
-Angles in degrees; `q` is the body-to-world quaternion; `truth` is present only for simulated input.
+Angles in degrees; `q` is the body-to-world quaternion; `stationary` is the EKF rest detector; `truth` is present only for simulated input.
 
 ## Testing
 
@@ -224,8 +227,8 @@ ctest --test-dir build --output-on-failure
 |---|---|
 | `test_math` | Quaternion/Euler conversions, rotation vectors, matrix inverse |
 | `test_stream_format` | Column layouts, delimiters, units, malformed lines |
-| `test_filters` | Initialisation, convergence, gating, timestamp handling, EKF bias estimate |
-| `test_accuracy` | RMSE against simulated ground truth for sway, aggressive and static motion, with and without magnetometer; EKF vs open-loop gyro; simulator determinism |
+| `test_filters` | Initialisation, convergence, gating, timestamp handling, EKF bias estimate, ZUPT rest detector |
+| `test_accuracy` | RMSE against simulated ground truth for sway, aggressive and static motion, with and without magnetometer; ZUPT z-bias and yaw drift on static no-magnetometer; EKF vs open-loop gyro; simulator determinism |
 | `test_net` | JSON, HTTP routing and loopback server, UDP source |
 | `test_app` | CLI parsing, end-to-end runs, file replay, CSV logging, error paths |
 
@@ -239,7 +242,7 @@ CI builds with GCC and Clang (warnings as errors), runs the whole suite again un
 
 **Roll/pitch look inverted or scaled wrongly.** The app is probably reporting deg/s or g; use `--gyro-deg` / `--accel-g`.
 
-**Yaw drifts.** Expected without a magnetometer. Enable it in the app and include `mx,my,mz` in `--columns`. Near steel or electronics the heading will be biased.
+**Yaw drifts.** Expected without a magnetometer while the device is moving. At rest the EKF learns the gyro bias (ZUPT) and holds the heading it had when it stopped; that heading is still arbitrary until a magnetometer is available. Enable it in the app and include `mx,my,mz` in `--columns` to hold yaw while moving. Near steel or electronics the heading will be biased. Use `--no-zupt` to turn the rest update off.
 
 **Viewer is empty or says "disconnected".** Open the URL printed at start-up. To view from another device use `--bind 0.0.0.0` (there is no authentication; use trusted networks only).
 

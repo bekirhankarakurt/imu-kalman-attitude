@@ -57,6 +57,7 @@ Simulator
 Filters
   --kp G --ki G           Mahony proportional / integral gains (default 1.5 / 0.1)
   --tau S                 complementary filter time constant (default 1.0)
+  --no-zupt               disable the EKF zero-angular-rate update
   --show NAME             complementary|mahony|ekf: filter shown in terminal and viewer (default ekf)
 
 Output
@@ -89,6 +90,7 @@ ParseResult parseArgs(const std::vector<std::string>& args) {
     if (a == "--gyro-deg") { o.gyroDegrees = true; continue; }
     if (a == "--accel-g") { o.accelInG = true; continue; }
     if (a == "--no-mag") { o.noMag = true; continue; }
+    if (a == "--no-zupt") { o.noZupt = true; continue; }
     if (a == "--realtime") { o.realtime = true; continue; }
     if (a == "--quiet") { o.quiet = true; continue; }
 

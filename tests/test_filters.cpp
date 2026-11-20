@@ -94,6 +94,61 @@ TEST(non_increasing_timestamps_are_ignored) {
   CHECK_NEAR(f.orientation().w, 1.0, 1e-12);
 }
 
+TEST(ekf_zupt_detects_rest_and_rejects_motion) {
+  ImuSample s;
+  s.accel = {0.0, 0.0, kGravity};
+  s.gyro = {0.0, 0.0, 0.013};
+  EkfFilter rest;
+  for (int i = 0; i <= 100; ++i) {
+    s.t = static_cast<double>(i) / 100.0;
+    rest.update(s);
+    if (i < 50) CHECK(!rest.stationary());
+  }
+  CHECK(rest.stationary());
+  CHECK_NEAR(rest.gyroBias().z, 0.013, 0.002);
+
+  // A sustained 0.5 rad/s turn is rotation, not a rest bias.
+  EkfFilter spin;
+  s.gyro = {0.0, 0.0, 0.5};
+  for (int i = 0; i <= 100; ++i) {
+    s.t = static_cast<double>(i) / 100.0;
+    spin.update(s);
+  }
+  CHECK(!spin.stationary());
+
+  // Specific force at 1.5 g is not rest, even with a constant gyro.
+  EkfFilter shaken;
+  s.gyro = {0.0, 0.0, 0.013};
+  s.accel = {0.0, 0.0, 1.5 * kGravity};
+  for (int i = 0; i <= 100; ++i) {
+    s.t = static_cast<double>(i) / 100.0;
+    shaken.update(s);
+  }
+  CHECK(!shaken.stationary());
+
+  // A dropout drops stale samples; the window has to fill again.
+  s.accel = {0.0, 0.0, kGravity};
+  s.gyro = {0.0, 0.0, 0.013};
+  s.t = 2.0;
+  rest.update(s);
+  CHECK(!rest.stationary());
+  for (int i = 1; i <= 50; ++i) {
+    s.t = 2.0 + static_cast<double>(i) / 100.0;
+    rest.update(s);
+  }
+  CHECK(rest.stationary());
+
+  EkfParams heldParams;
+  heldParams.zupt = false;
+  EkfFilter held(heldParams);
+  for (int i = 0; i <= 100; ++i) {
+    s.t = static_cast<double>(i) / 100.0;
+    held.update(s);
+  }
+  CHECK(held.stationary());
+  CHECK_NEAR(held.gyroBias().z, 0.0, 1e-9);
+}
+
 TEST(ekf_estimates_constant_gyro_bias_when_static) {
   SimConfig cfg;
   cfg.profile = Profile::Static;

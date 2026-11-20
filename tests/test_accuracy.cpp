@@ -1,4 +1,5 @@
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 #include "imu/evaluation.hpp"
@@ -15,10 +16,10 @@ struct Result {
   Vec3 biasError[FilterBank::kCount];
 };
 
-Result simulate(const SimConfig& cfg, double warmup = 10.0) {
+Result simulate(const SimConfig& cfg, double warmup = 10.0, const FilterBank::Config& bankCfg = {}) {
   Result r;
   ImuSimulator sim(cfg);
-  FilterBank bank;
+  FilterBank bank(bankCfg);
   SimSample s;
   while (sim.next(s)) {
     bank.update(s.imu);
@@ -83,20 +84,63 @@ TEST(static_pose_is_estimated_precisely) {
 }
 
 TEST(static_without_magnetometer_ekf_yaw_does_not_wander) {
-  // Lying still without a magnetometer, yaw and the z gyro bias are unobservable. The EKF
-  // must not "learn" a bias there from tilt updates: it used to wander by up to 3 deg/s and
-  // the yaw error reached 80 deg in a minute, far worse than plain gyro integration.
+  // With ZUPT off, yaw and the z gyro bias are unobservable. The EKF must not "learn" a
+  // bias there from tilt updates: it used to wander by up to 3 deg/s and the yaw error
+  // reached 80 deg in a minute, far worse than plain gyro integration.
+  FilterBank::Config bankCfg;
+  bankCfg.ekf.zupt = false;
   for (std::uint64_t seed = 1; seed <= 3; ++seed) {
     SimConfig cfg;
     cfg.profile = Profile::Static;
     cfg.durationS = 60.0;
     cfg.magnetometer = false;
     cfg.seed = seed;
-    const Result r = simulate(cfg);
+    const Result r = simulate(cfg, 10.0, bankCfg);
     CHECK_LT(r.errors[kEkf].yawRmseDeg(), r.errors[kMahony].yawRmseDeg() + 1.0);
     CHECK_LT(radToDeg(r.biasError[kEkf].norm()), 0.7);
     CHECK_LT(r.errors[kEkf].rollRmseDeg(), 0.2);
     CHECK_LT(r.errors[kEkf].pitchRmseDeg(), 0.2);
+  }
+}
+
+TEST(static_without_magnetometer_zupt_learns_z_bias) {
+  // Truth yaw is 30 deg and the filter has no magnetometer, so absolute yaw stays at the
+  // unknown initial heading. What ZUPT removes is the drift: after warm-up the heading is
+  // held and the z bias (unobservable from gravity) matches the gyro.
+  for (std::uint64_t seed = 1; seed <= 3; ++seed) {
+    SimConfig cfg;
+    cfg.profile = Profile::Static;
+    cfg.durationS = 60.0;
+    cfg.magnetometer = false;
+    cfg.seed = seed;
+    ImuSimulator sim(cfg);
+    EkfFilter ekf;
+    SimSample s;
+    ErrorAccumulator errors;
+    double lock = 0.0;
+    bool haveLock = false;
+    double driftSq = 0.0;
+    std::size_t driftN = 0;
+    while (sim.next(s)) {
+      ekf.update(s.imu);
+      if (s.imu.t < 10.0) continue;
+      errors.add(ekf.orientation(), s.truth);
+      const double dy =
+          radToDeg(wrapPi(ekf.orientation().toEuler().yaw - s.truth.toEuler().yaw));
+      if (!haveLock) {
+        lock = dy;
+        haveLock = true;
+      }
+      const double d = dy - lock;
+      driftSq += d * d;
+      ++driftN;
+    }
+    CHECK(driftN > 0);
+    const double driftRmse = std::sqrt(driftSq / static_cast<double>(driftN));
+    CHECK_LT(std::abs(radToDeg((ekf.gyroBias() - s.trueBias).z)), 0.1);
+    CHECK_LT(driftRmse, 3.0);
+    CHECK_LT(errors.rollRmseDeg(), 0.2);
+    CHECK_LT(errors.pitchRmseDeg(), 0.2);
   }
 }
 

@@ -89,6 +89,7 @@ int run(const Options& o, std::ostream& out, std::ostream& err, const std::atomi
     cfg.mahony.kp = o.kp;
     cfg.mahony.ki = o.ki;
     cfg.complementary.tau = o.tau;
+    cfg.ekf.zupt = !o.noZupt;
     FilterBank bank(cfg);
 
     StateStore store;
@@ -166,6 +167,7 @@ int run(const Options& o, std::ostream& out, std::ostream& err, const std::atomi
         snap.samples = samples;
         snap.rateHz = rate;
         snap.selected = std::string(toString(o.show));
+        snap.stationary = bank.get(FilterKind::Ekf).stationary();
         snap.truth = frame.truth;
         for (std::size_t k = 0; k < FilterBank::kCount; ++k) {
           const AttitudeFilter& f = bank.get(static_cast<FilterKind>(k));
@@ -197,7 +199,10 @@ int run(const Options& o, std::ostream& out, std::ostream& err, const std::atomi
 
     if (haveTruth) {
       out << "\nerror vs ground truth, RMSE after " << fixed(warmup, 1) << " s warm-up [deg]";
-      if (o.noMag) out << "  (no magnetometer: yaw is unobservable)";
+      if (o.noMag) {
+        out << (o.noZupt ? "  (no magnetometer: yaw is unobservable)"
+                         : "  (no magnetometer: yaw drifts while moving; bias is learned at rest)");
+      }
       out << '\n';
       out << "filter          roll   pitch     yaw  attitude  bias err [deg/s]\n";
       for (std::size_t k = 0; k < FilterBank::kCount; ++k) {

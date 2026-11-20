@@ -45,6 +45,7 @@ std::string_view viewerHtml() noexcept {
   </div>
   <div class="panel"><table>
     <tr><td>Gyro bias (deg/s)</td><td id="bias">-</td></tr>
+    <tr><td>Still</td><td id="still">-</td></tr>
     <tr><td>Attitude error vs truth</td><td id="err">n/a</td></tr>
     <tr><td>Stream time</td><td id="time">-</td></tr>
     <tr><td>Sample rate</td><td id="rate">-</td></tr>
@@ -96,6 +97,7 @@ std::string_view viewerHtml() noexcept {
   function f2(v) { return (v >= 0 ? '+' : '') + v.toFixed(2); }
 
   function render(s) {
+    $('still').textContent = s.stationary ? 'yes' : 'no';
     if (sel.options.length !== s.filters.length) {
       sel.innerHTML = '';
       s.filters.forEach(function (f) { var o = document.createElement('option'); o.value = o.textContent = f.name; sel.appendChild(o); });

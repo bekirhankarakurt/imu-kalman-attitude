@@ -21,6 +21,7 @@ struct Snapshot {
   double t{0.0};
   std::size_t samples{0};
   double rateHz{0.0};
+  bool stationary{false};  ///< EKF rest detector
   std::string selected;
   std::vector<FilterState> filters;
   std::optional<Quat> truth;

@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- EKF zero-angular-rate update (ZUPT). While a 0.5 s window of raw gyro and accel shows the device is still, the filter treats the mean raw gyro as the bias, so all three components — including the z axis, which gravity cannot observe — are learned at rest. `--no-zupt` disables the update; the viewer shows the detector as Still yes/no and `/api/state` reports `"stationary"`. Static no-magnetometer, 60 s, seed 1: EKF yaw RMSE 14.22 deg and bias error 0.503 deg/s without ZUPT (Mahony 14.24 deg); with ZUPT, bias error 0.055 deg/s and absolute yaw RMSE 29.72 deg. The 14 deg figure was the uncorrected bias walking through the unknown 30 deg initial heading; with the bias removed that heading is held. Seeds 1-3 keep the z bias error under 0.1 deg/s and the drift about the held heading under 3 deg.
+
 ### Fixed
 - EKF yaw no longer drifts by several deg/s on a device lying still without a magnetometer. Tilt updates moved the unobservable z gyro bias through spurious cross-covariance; while the rotation rate is below `EkfParams::stillRate` (0.05 rad/s) the gravity update now leaves attitude and bias about the gravity axis untouched. Static no-magnetometer yaw RMSE over 60 s drops from 10-82 deg to 14 deg (same as Mahony); all other simulated cases are unchanged.
 

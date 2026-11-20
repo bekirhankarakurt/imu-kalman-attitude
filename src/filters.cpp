@@ -76,6 +76,7 @@ void AttitudeFilter::update(const ImuSample& s) {
   const double dt = s.t - lastT_;
   if (dt <= 0.0) return;
   lastT_ = s.t;
+  if (dt > kMaxDt) onDropout();
   step(s, std::min(dt, kMaxDt));
 }
 
@@ -98,7 +99,7 @@ void MahonyFilter::step(const ImuSample& s, double dt) {
   q_ = (q_ * Quat::fromRotationVector(omega * dt)).normalized();
 }
 
-void EkfFilter::onInit(const ImuSample& /*s*/) {
+void EkfFilter::onInit(const ImuSample& s) {
   cov_ = Mat6{};
   const double a = p_.initialAttitudeStd * p_.initialAttitudeStd;
   const double b = p_.initialBiasStd * p_.initialBiasStd;
@@ -106,9 +107,77 @@ void EkfFilter::onInit(const ImuSample& /*s*/) {
     cov_(i, i) = a;
     cov_(3 + i, 3 + i) = b;
   }
+  observe(s);
+}
+
+void EkfFilter::onDropout() { clearWindow(); }
+
+void EkfFilter::clearWindow() noexcept {
+  window_.clear();
+  zuptMean_ = {};
+  zuptSpan_ = 0.0;
+  stationary_ = false;
+}
+
+void EkfFilter::observe(const ImuSample& s) {
+  if (window_.size() == kWindowCap) window_.pop_front();
+  window_.push_back(WindowSample{s.t, s.gyro, s.accel});
+  while (window_.size() > 1 && window_.back().t - window_[1].t >= p_.zuptWindowS) window_.pop_front();
+
+  stationary_ = false;
+  zuptMean_ = {};
+  zuptSpan_ = 0.0;
+  if (window_.size() < 2 || !(p_.zuptWindowS > 0.0)) return;
+  zuptSpan_ = window_.back().t - window_.front().t;
+  if (zuptSpan_ < p_.zuptWindowS) return;
+
+  for (const WindowSample& sample : window_) {
+    if (std::abs(sample.accel.norm() - kGravity) > p_.zuptAccelTol) return;
+  }
+
+  Vec3 sum;
+  for (const WindowSample& sample : window_) sum += sample.gyro;
+  zuptMean_ = sum / static_cast<double>(window_.size());
+  // Per-axis std, not |gyro| against zuptGyroStd: a constant rest bias such as 0.013 rad/s
+  // is larger than that gate and must still count as still. A mean at or above stillRate is
+  // rotation; the std of a constant rate cannot tell that apart from a bias.
+  if (std::abs(zuptMean_.x) >= p_.stillRate || std::abs(zuptMean_.y) >= p_.stillRate ||
+      std::abs(zuptMean_.z) >= p_.stillRate) {
+    return;
+  }
+
+  Vec3 sq;
+  for (const WindowSample& sample : window_) {
+    const Vec3 d = sample.gyro - zuptMean_;
+    sq.x += d.x * d.x;
+    sq.y += d.y * d.y;
+    sq.z += d.z * d.z;
+  }
+  const double n = static_cast<double>(window_.size());
+  stationary_ = std::sqrt(sq.x / n) < p_.zuptGyroStd && std::sqrt(sq.y / n) < p_.zuptGyroStd &&
+                std::sqrt(sq.z / n) < p_.zuptGyroStd;
+}
+
+void EkfFilter::applyZupt() {
+  if (!(zuptSpan_ > 0.0)) return;
+  // Measured rate is zero, so the raw gyro equals the bias. H picks out the bias error.
+  Mat<3, 6> h;
+  h(0, 3) = 1.0;
+  h(1, 4) = 1.0;
+  h(2, 5) = 1.0;
+  const Vec3 residual = zuptMean_ - bias_;
+  Mat<3, 1> y;
+  y(0, 0) = residual.x;
+  y(1, 0) = residual.y;
+  y(2, 0) = residual.z;
+  constexpr double kRateFloor = 1e-4;  // rad/s; keeps R from collapsing to singular
+  const double variance = p_.gyroNoise * p_.gyroNoise / zuptSpan_ + kRateFloor * kRateFloor;
+  correct(h, y, variance * identity<3>());
 }
 
 void EkfFilter::step(const ImuSample& s, double dt) {
+  observe(s);
+
   // Predict: integrate bias-corrected gyro, propagate covariance of [dtheta, dbias].
   const Vec3 w = s.gyro - bias_;
   q_ = (q_ * Quat::fromRotationVector(w * dt)).normalized();
@@ -152,7 +221,11 @@ void EkfFilter::step(const ImuSample& s, double dt) {
     correct(h, y, (sigma * sigma / weight) * identity<3>(), still ? &expected : nullptr);
   }
 
-  // Update 2: heading from the tilt-compensated magnetometer. A rotation about world z
+  // Update: zero angular rate while the detector says the device is still. The mean raw gyro
+  // over the window is the bias, which makes the gravity-aligned component observable.
+  if (p_.zupt && stationary_) applyZupt();
+
+  // Update: heading from the tilt-compensated magnetometer. A rotation about world z
   // changes heading one-to-one; its body-frame direction is g_b.
   if (s.mag) {
     if (const auto yawErr = yawErrorOf(q_, *s.mag)) {

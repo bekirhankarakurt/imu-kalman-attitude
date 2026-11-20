@@ -36,7 +36,9 @@ std::string toJson(const Snapshot& s) {
   appendNumber(out, s.t, 3);
   out += R"(,"samples":)" + std::to_string(s.samples) + R"(,"rate_hz":)";
   appendNumber(out, s.rateHz, 1);
-  out += R"(,"selected":")" + s.selected + R"(","filters":[)";
+  out += R"(,"selected":")" + s.selected + R"(","stationary":)";
+  out += s.stationary ? "true" : "false";
+  out += R"(,"filters":[)";
   for (std::size_t i = 0; i < s.filters.size(); ++i) {
     const FilterState& f = s.filters[i];
     if (i != 0) out += ',';

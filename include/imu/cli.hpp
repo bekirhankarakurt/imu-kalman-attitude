@@ -39,6 +39,7 @@ struct Options {
   double kp{1.5};
   double ki{0.1};
   double tau{1.0};
+  bool noZupt{false};
   bool help{false};
 };
 

@@ -38,6 +38,12 @@ TEST(cli_defaults_and_overrides) {
   CHECK(def.error.empty());
   CHECK(def.options.source == SourceKind::Sim);
   CHECK(!def.options.httpPort.has_value());
+  CHECK(!def.options.noZupt);
+
+  const ParseResult zupt = parse({"--no-zupt", "--quiet"});
+  CHECK(zupt.error.empty());
+  CHECK(zupt.options.noZupt);
+  CHECK(zupt.options.quiet);
 
   const ParseResult r = parse({"--source", "udp", "--port", "6000", "--http", "8080", "--show", "mahony",
                                "--gyro-bias", "0.1,0.2,0.3", "--gyro-deg", "--duration", "0"});
