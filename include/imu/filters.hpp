@@ -66,6 +66,8 @@ struct EkfParams {
   double magYawStd{0.05};           ///< magnetometer heading noise [rad]
   double initialAttitudeStd{0.2};   ///< [rad]
   double initialBiasStd{0.05};      ///< [rad/s]
+  /// Below this rotation rate [rad/s] the bias about gravity is treated as unobservable.
+  double stillRate{0.05};
 };
 
 class ComplementaryFilter final : public AttitudeFilter {
@@ -101,8 +103,11 @@ class EkfFilter final : public AttitudeFilter {
   using Mat6 = Mat<6, 6>;
   void onInit(const ImuSample& s) override;
   void step(const ImuSample& s, double dt) override;
+  /// Kalman update. When @p blindAxis is set, the update must not rotate the attitude or
+  /// move the gyro bias about that body-frame axis (it carries no information about it).
   template <std::size_t M>
-  void correct(const Mat<M, 6>& h, const Mat<M, 1>& residual, const Mat<M, M>& noise);
+  void correct(const Mat<M, 6>& h, const Mat<M, 1>& residual, const Mat<M, M>& noise,
+               const Vec3* blindAxis = nullptr);
 
   EkfParams p_;
   Vec3 bias_;

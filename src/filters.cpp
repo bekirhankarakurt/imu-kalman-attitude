@@ -143,7 +143,13 @@ void EkfFilter::step(const ImuSample& s, double dt) {
     y(1, 0) = r.y;
     y(2, 0) = r.z;
     const double sigma = p_.accelNoise / std::sqrt(dt) / kGravity;
-    correct(h, y, (sigma * sigma / weight) * identity<3>());
+    // While the device is (nearly) still, gravity carries no information about rotation
+    // about the gravity axis or the gyro bias along it; only rotation makes the bias
+    // observable. Without this guard, spurious cross-covariance lets every tilt update
+    // nudge yaw and that bias component, which wanders within its large, never-observed
+    // prior, and the yaw drifts by several deg/s on a device lying still.
+    const bool still = w.norm() < p_.stillRate;
+    correct(h, y, (sigma * sigma / weight) * identity<3>(), still ? &expected : nullptr);
   }
 
   // Update 2: heading from the tilt-compensated magnetometer. A rotation about world z
@@ -165,11 +171,25 @@ void EkfFilter::step(const ImuSample& s, double dt) {
 }
 
 template <std::size_t M>
-void EkfFilter::correct(const Mat<M, 6>& h, const Mat<M, 1>& residual, const Mat<M, M>& noise) {
+void EkfFilter::correct(const Mat<M, 6>& h, const Mat<M, 1>& residual, const Mat<M, M>& noise,
+                        const Vec3* blindAxis) {
   const Mat<6, M> ht = transpose(h);
   const auto sInv = inverse(h * cov_ * ht + noise);
   if (!sInv) return;
-  const Mat<6, M> gain = cov_ * ht * (*sInv);
+  Mat<6, M> gain = cov_ * ht * (*sInv);
+  if (blindAxis != nullptr && blindAxis->norm() > 1e-9) {
+    // Project the attitude rows and the bias rows off the blind axis. Any gain is valid in
+    // the Joseph-form covariance update below, so P stays consistent with this gain.
+    const Vec3 u = *blindAxis / blindAxis->norm();
+    for (std::size_t row = 0; row < 6; row += 3) {
+      for (std::size_t j = 0; j < M; ++j) {
+        const double along = u.x * gain(row, j) + u.y * gain(row + 1, j) + u.z * gain(row + 2, j);
+        gain(row, j) -= along * u.x;
+        gain(row + 1, j) -= along * u.y;
+        gain(row + 2, j) -= along * u.z;
+      }
+    }
+  }
   const Mat<6, 1> dx = gain * residual;
 
   q_ = (q_ * Quat::fromRotationVector({dx(0, 0), dx(1, 0), dx(2, 0)})).normalized();

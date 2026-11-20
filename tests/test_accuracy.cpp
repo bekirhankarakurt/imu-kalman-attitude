@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdint>
 
 #include "imu/evaluation.hpp"
 #include "imu/filters.hpp"
@@ -79,6 +80,24 @@ TEST(static_pose_is_estimated_precisely) {
   CHECK_LT(r.errors[kEkf].attitudeRmseDeg(), 0.2);
   CHECK_LT(r.errors[kMahony].attitudeRmseDeg(), 0.6);
   CHECK_LT(radToDeg(r.biasError[kEkf].norm()), 0.1);
+}
+
+TEST(static_without_magnetometer_ekf_yaw_does_not_wander) {
+  // Lying still without a magnetometer, yaw and the z gyro bias are unobservable. The EKF
+  // must not "learn" a bias there from tilt updates: it used to wander by up to 3 deg/s and
+  // the yaw error reached 80 deg in a minute, far worse than plain gyro integration.
+  for (std::uint64_t seed = 1; seed <= 3; ++seed) {
+    SimConfig cfg;
+    cfg.profile = Profile::Static;
+    cfg.durationS = 60.0;
+    cfg.magnetometer = false;
+    cfg.seed = seed;
+    const Result r = simulate(cfg);
+    CHECK_LT(r.errors[kEkf].yawRmseDeg(), r.errors[kMahony].yawRmseDeg() + 1.0);
+    CHECK_LT(radToDeg(r.biasError[kEkf].norm()), 0.7);
+    CHECK_LT(r.errors[kEkf].rollRmseDeg(), 0.2);
+    CHECK_LT(r.errors[kEkf].pitchRmseDeg(), 0.2);
+  }
 }
 
 TEST(ekf_beats_uncorrected_gyro_integration) {

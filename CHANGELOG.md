@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- EKF yaw no longer drifts by several deg/s on a device lying still without a magnetometer. Tilt updates moved the unobservable z gyro bias through spurious cross-covariance; while the rotation rate is below `EkfParams::stillRate` (0.05 rad/s) the gravity update now leaves attitude and bias about the gravity axis untouched. Static no-magnetometer yaw RMSE over 60 s drops from 10-82 deg to 14 deg (same as Mahony); all other simulated cases are unchanged.
+
 ## [1.0.0] - 2026-11-04
 
 ### Added
